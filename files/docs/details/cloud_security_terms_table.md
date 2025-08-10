@@ -271,3 +271,200 @@
 | **OCTAVE** | Operationally Critical Threat, Asset, and Vulnerability Evaluation | Methodology | Risk-based strategic assessment methodology |
 
 *Note: This table includes terms from NIST frameworks, Cloud Security Alliance, industry standards, and common cloud security practices. Many terms overlap across categories and may have multiple applications in cloud security contexts.*
+
+
+# Comprehensive Cloud Security, CSPM, NIST, CNCF Acronyms & Terms Reference Guide
+
+This comprehensive reference guide covers **260 essential acronyms and terms** across cloud security, cybersecurity frameworks, and modern infrastructure technologies that every security professional should know.[1][2][3]
+
+## **Core Cloud Security & CSPM Terms**
+
+| Acronym/Term | Full Form/Definition | Key Usage Context |
+|-------------|---------------------|-------------------|
+| **CSPM** | Cloud Security Posture Management | Automated monitoring and remediation of cloud misconfigurations [1][4][2] |
+| **CNAPP** | Cloud-Native Application Protection Platform | Unified security platform combining CSPM, CWPP, and CIEM [5][6] |
+| **CWPP** | Cloud Workload Protection Platform | Runtime protection for cloud workloads and containers [7][6] |
+| **CIEM** | Cloud Infrastructure Entitlement Management | Managing cloud permissions and access rights [8][7] |
+| **CASB** | Cloud Access Security Broker | Gateway between users and cloud applications [9][5] |
+| **CDR** | Cloud Detection and Response | Cloud-native threat detection and incident response [8] |
+| **DSPM** | Data Security Posture Management | Data-centric security posture monitoring [5][10] |
+| **KSPM** | Kubernetes Security Posture Management | Kubernetes-specific security configuration management [5] |
+| **SASE** | Secure Access Service Edge | Cloud-delivered network security framework [9][3] |
+| **ZTNA** | Zero Trust Network Access | Zero trust security model implementation [9][3] |
+
+## **NIST Cybersecurity Framework & Standards**
+
+| Acronym/Term | Full Form/Definition | Key Usage Context |
+|-------------|---------------------|-------------------|
+| **NIST** | National Institute of Standards and Technology | US federal cybersecurity standards body [11][12][13] |
+| **CSF** | Cybersecurity Framework | Five-function cybersecurity framework (Identify, Protect, Detect, Respond, Recover) [11][12] |
+| **RMF** | Risk Management Framework | NIST framework for managing cybersecurity risks [11][14] |
+| **FISMA** | Federal Information Security Management Act | US federal information security law [13][14] |
+| **FedRAMP** | Federal Risk and Authorization Management Program | Cloud security assessment program [13] |
+| **SP 800-53** | Special Publication 800-53 | NIST security and privacy controls catalog [12][14] |
+| **CVSS** | Common Vulnerability Scoring System | Vulnerability severity rating system [15][8] |
+| **CVE** | Common Vulnerabilities and Exposures | Standardized vulnerability identifiers [15][8] |
+| **CWE** | Common Weakness Enumeration | Software weakness classification system [8][16] |
+| **NVD** | National Vulnerability Database | US government vulnerability database [5] |
+
+## **CNCF & Cloud Native Security**
+
+| Acronym/Term | Full Form/Definition | Key Usage Context |
+|-------------|---------------------|-------------------|
+| **CNCF** | Cloud Native Computing Foundation | Open source cloud native technology foundation [17][18][19] |
+| **OCI** | Open Container Initiative | Container format and runtime standards [8][16] |
+| **CRI** | Container Runtime Interface | Kubernetes container runtime API [8][16] |
+| **CNI** | Container Network Interface | Container networking specification [8] |
+| **CSI** | Container Storage Interface | Container storage specification [8] |
+| **OPA** | Open Policy Agent | Policy engine for cloud native environments [18][20] |
+| **RBAC** | Role-Based Access Control | Access control based on user roles [18][8] |
+| **PSA** | Pod Security Admission | Kubernetes pod security enforcement [17] |
+| **SPIFFE** | Secure Production Identity Framework For Everyone | Workload identity framework [18] |
+| **SBOM** | Software Bill of Materials | Inventory of software components [18][20] |
+
+## **Identity & Access Management**
+
+| Acronym/Term | Full Form/Definition | Key Usage Context |
+|-------------|---------------------|-------------------|
+| **IAM** | Identity and Access Management | User identity and access control systems [9][8] |
+| **CIAM** | Customer Identity and Access Management | Customer-facing identity management [8] |
+| **PAM** | Privileged Access Management | Managing privileged user accounts [8] |
+| **SSO** | Single Sign-On | Single authentication for multiple applications [9][3] |
+| **MFA** | Multi-Factor Authentication | Multiple authentication factors [9][3] |
+| **SAML** | Security Assertion Markup Language | XML-based authentication standard [8][16] |
+| **OAuth** | Open Authorization | Authorization framework [8][16] |
+| **OIDC** | OpenID Connect | Identity layer on OAuth 2.0 [8][16] |
+| **POLP** | Principle of Least Privilege | Minimum necessary access rights [5][21] |
+| **JIT** | Just-In-Time | Temporary access provisioning [8] |
+
+## **Network & Infrastructure Security**
+
+| Acronym/Term | Full Form/Definition | Key Usage Context |
+|-------------|---------------------|-------------------|
+| **NGFW** | Next-Generation Firewall | Advanced firewall with deep packet inspection [9][3] |
+| **WAF** | Web Application Firewall | HTTP application firewall [9][3] |
+| **IDS/IPS** | Intrusion Detection/Prevention System | Network security monitoring [9][3] |
+| **NAC** | Network Access Control | Network access policy enforcement [22][21] |
+| **VPN** | Virtual Private Network | Secure network connections [9][3] |
+| **DMZ** | Demilitarized Zone | Network security buffer zone [22][21] |
+| **DNSSEC** | DNS Security Extensions | DNS integrity and authentication [8][16] |
+| **TLS/SSL** | Transport Layer Security/Secure Sockets Layer | Cryptographic protocols [8][16] |
+| **PKI** | Public Key Infrastructure | Public key cryptography framework [22][21] |
+| **HSM** | Hardware Security Module | Hardware cryptographic device [8][16] |
+
+## **Endpoint & Application Security**
+
+| Acronym/Term | Full Form/Definition | Key Usage Context |
+|-------------|---------------------|-------------------|
+| **EDR** | Endpoint Detection and Response | Endpoint threat detection [9][3] |
+| **XDR** | Extended Detection and Response | Multi-layer threat detection [8][3] |
+| **NGAV** | Next-Generation Antivirus | Advanced antivirus with behavior analysis [8] |
+| **SAST** | Static Application Security Testing | Source code security analysis [8][23] |
+| **DAST** | Dynamic Application Security Testing | Runtime application security testing [8][23] |
+| **IAST** | Interactive Application Security Testing | Real-time application security testing [8] |
+| **SCA** | Software Composition Analysis | Third-party component security analysis [8] |
+| **OWASP Top 10** | Open Web Application Security Project Top 10 | Most critical web application risks [24][23] |
+| **XSS** | Cross-Site Scripting | Web application vulnerability [24][8] |
+| **CSRF** | Cross-Site Request Forgery | Web application attack [24][8] |
+
+## **DevSecOps & CI/CD Security**
+
+| Acronym/Term | Full Form/Definition | Key Usage Context |
+|-------------|---------------------|-------------------|
+| **DevSecOps** | Development Security Operations | Security integrated into DevOps [9][23] |
+| **CI/CD** | Continuous Integration/Continuous Deployment | Automated software delivery pipeline [25][5] |
+| **IaC** | Infrastructure as Code | Infrastructure provisioning through code [25][8] |
+| **GitOps** | Git Operations | Git-based infrastructure and application management [8] |
+| **SSDLC** | Secure Software Development Life Cycle | Security-integrated development process [23] |
+| **SARIF** | Static Analysis Results Interchange Format | Standard for static analysis results [8] |
+| **SLSA** | Supply-chain Levels for Software Artifacts | Supply chain security framework [18][20] |
+| **Sigstore** | Cryptographic Software Signing | Software artifact signing and verification [18] |
+| **SPDX** | Software Package Data Exchange | SBOM standard format [18] |
+| **CycloneDX** | CycloneDX SBOM Standard | Lightweight SBOM standard [8] |
+
+## **Threat Intelligence & Incident Response**
+
+| Acronym/Term | Full Form/Definition | Key Usage Context |
+|-------------|---------------------|-------------------|
+| **CTI** | Cyber Threat Intelligence | Threat information and analysis [9][8] |
+| **IOC** | Indicators of Compromise | Evidence of security breaches [8][16] |
+| **IOA** | Indicators of Attack | Evidence of attack techniques [8] |
+| **TTPs** | Tactics, Techniques, and Procedures | Adversary behavior patterns [8][16] |
+| **STIX** | Structured Threat Information eXpression | Threat information sharing standard [8] |
+| **MITRE ATT&CK** | Adversarial Tactics, Techniques, and Common Knowledge | Adversary behavior framework [9][8] |
+| **CSIRT** | Computer Security Incident Response Team | Incident response organization [26][8] |
+| **DFIR** | Digital Forensics and Incident Response | Investigation and response activities [8][16] |
+| **SOAR** | Security Orchestration, Automation and Response | Automated incident response [9][3] |
+| **SIEM** | Security Information and Event Management | Security log management and analysis [9][3] |
+
+## **Compliance & Risk Management**
+
+| Acronym/Term | Full Form/Definition | Key Usage Context |
+|-------------|---------------------|-------------------|
+| **GRC** | Governance, Risk Management, and Compliance | Integrated risk and compliance management [9][3] |
+| **SOC 2** | Service Organization Control 2 | Trust services audit standard [1][9] |
+| **ISO 27001** | International Organization for Standardization 27001 | Information security management standard [1][9] |
+| **PCI DSS** | Payment Card Industry Data Security Standard | Payment card security standard [1][9] |
+| **GDPR** | General Data Protection Regulation | EU data protection regulation [1][9] |
+| **HIPAA** | Health Insurance Portability and Accountability Act | US healthcare data protection law [1][9] |
+| **RTO** | Recovery Time Objective | Maximum acceptable downtime [9][3] |
+| **RPO** | Recovery Point Objective | Maximum acceptable data loss [9][3] |
+| **MTTR** | Mean Time to Repair/Respond | Average incident response time [9][3] |
+| **MTTD** | Mean Time to Detect | Average threat detection time [9][3] |
+
+## **Cryptography & Data Protection**
+
+| Acronym/Term | Full Form/Definition | Key Usage Context |
+|-------------|---------------------|-------------------|
+| **AES** | Advanced Encryption Standard | Symmetric encryption algorithm [8][16] |
+| **RSA** | Rivest-Shamir-Adleman | Asymmetric encryption algorithm [8][16] |
+| **ECC** | Elliptic Curve Cryptography | Public key cryptography method [8][16] |
+| **SHA** | Secure Hash Algorithm | Cryptographic hash function [8][16] |
+| **HMAC** | Hash-based Message Authentication Code | Message integrity verification [8][16] |
+| **PGP/GPG** | Pretty Good Privacy/GNU Privacy Guard | Email and file encryption [8][16] |
+| **E2EE** | End-to-End Encryption | Complete communication path encryption [8] |
+| **KMS** | Key Management Service | Cryptographic key management [8] |
+| **DLP** | Data Loss Prevention | Data leakage protection [9][3] |
+| **FDE** | Full Disk Encryption | Complete disk encryption [8] |
+
+This comprehensive reference covers the essential terminology for modern cloud security, cybersecurity frameworks, and infrastructure technologies. Understanding these terms is crucial for effective communication in security roles, compliance audits, risk assessments, and technical implementations across hybrid and multi-cloud environments.[2][3][5][1]
+
+[1] https://orca.security/resources/blog/what-is-cspm/
+[2] https://www.zscaler.com/resources/security-terms-glossary/what-is-cloud-security-posture-management-cspm
+[3] https://interlaced.io/blog/your-guide-to-cybersecurity-acronyms-cyber-series-part-1/
+[4] https://www.cloudflare.com/learning/cloud/what-is-cspm/
+[5] https://www.clouddefense.ai/top-cloud-security-terms/
+[6] https://orca.security/resources/blog/cwpp-cspm-ciem-cnapp/
+[7] https://sonraisecurity.com/blog/acronyms-cloud-security/
+[8] https://github.com/cloudsecurelab/security-acronyms
+[9] https://www.connectwise.com/blog/essential-cybersecurity-acronyms
+[10] https://cyberprotection-magazine.com/cloud-security-cheat-sheet-theres-an-acronym-for-that
+[11] https://auditboard.com/blog/nist-cybersecurity-framework
+[12] https://www.logicgate.com/blog/understanding-nist-csf-2-0-cybersecurity-framework/
+[13] https://www.sharetru.com/blog/nist-101-everything-you-need-to-know-about-the-nist-framework
+[14] https://www.nccoe.nist.gov/publication/1800-25/VolB/vol-b-appendix.html
+[15] https://public.cyber.mil/acronyms/
+[16] https://github.com/0xsyr0/Cybersecurity-Glossary
+[17] https://kubernetes.io/docs/concepts/security/cloud-native-security/
+[18] https://tag-security.cncf.io/community/resources/security-lexicon/cloud-native-security-lexicon/
+[19] https://orca.security/glossary/cncf/
+[20] https://www.cncf.io/blog/2022/06/07/introduction-to-the-cloud-native-security-controls-catalog/
+[21] https://www.sans.org/security-resources/glossary-of-terms
+[22] https://www.icaew.com/technical/technology/cyber-security/cyber-security-guidance/glossary-of-it-security-terms
+[23] https://www.webasha.com/blog/essential-it-security-abbreviations-a-comprehensive-guide-for-cybersecurity-experts
+[24] https://www.metacompliance.com/cyber-security-terminology
+[25] https://www.ibm.com/think/topics/cspm
+[26] https://www.uscybersecurity.net/cybersecurity-acronyms/
+[27] https://glossary.cncf.io/cloud-native-security/
+[28] https://www.paloaltonetworks.com/cyberpedia/what-is-cloud-security-posture-management
+[29] https://www.cncf.io/wp-content/uploads/2022/06/CNCF_cloud-native-security-whitepaper-May2022-v2.pdf
+[30] https://www.oracle.com/in/security/cloud-security/what-is-cspm/
+[31] https://www.wiz.io/academy/what-is-cloud-security-posture-management-cspm
+[32] https://www.nccoe.nist.gov/publication/1800-28/VolB/vol-b-appendix.html
+[33] https://www.ftc.gov/business-guidance/small-businesses/cybersecurity/nist-framework
+[34] https://www.itgovernance.co.uk/files/9781905356218-v1.pdf
+[35] https://www.ukcybersecuritycouncil.org.uk/glossary/
+[36] https://safebase.io/resources/security-glossary
+[37] https://www.clearscale.com/resources/aws-and-cloud-computing-acronyms
+[38] https://csrc.nist.gov/glossary
+[39] https://www.menlosecurity.com/what-is/glossary
