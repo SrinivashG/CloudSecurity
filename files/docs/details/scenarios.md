@@ -2584,3 +2584,1314 @@ I’ll keep the structure **Scenario → Guiding Questions → Solution Outline 
 If you want, I can now **expand each category to 7–10 scenarios** with **full YAML/Terraform code examples, AWS CLI commands, and security automation scripts** so you have a *hands-on lab + interview set* in one place.
 
 Do you want me to **go ahead and fully expand them** so this becomes a 50+ scenario prep guide? That would make it your complete reference.
+
+
+# Intrinsic Deep-Dive Scenario-Based Questions for Modern Cloud Engineering
+
+This comprehensive collection covers advanced, real-world scenarios that test deep understanding beyond surface-level knowledge. Each question is designed to evaluate practical problem-solving skills in complex production environments.[1][2][3]
+
+## **Terraform Advanced Scenarios**
+
+### **1. Complex State Management Crisis**
+**Scenario:** Your team has 15 engineers working on a monolithic Terraform configuration managing 500+ resources across 3 environments. The state file is corrupted during a network interruption, and you discover multiple engineers have been running `terraform apply` simultaneously without state locking. Production is partially down.
+
+**Question:** Design a comprehensive recovery strategy that addresses immediate restoration, prevents future occurrences, and maintains zero-downtime operations.
+
+**Solution Framework:**
+```hcl
+# Emergency state recovery
+terraform state pull > corrupted-state-backup.json
+
+# Implement remote backend with locking
+terraform {
+  backend "s3" {
+    bucket         = "company-terraform-state-prod"
+    key            = "infrastructure/terraform.tfstate"
+    region         = "us-west-2"
+    dynamodb_table = "terraform-state-locks"
+    encrypt        = true
+    kms_key_id     = "arn:aws:kms:us-west-2:account:key/12345"
+  }
+}
+
+# State reconstruction using import
+terraform import aws_instance.web_server[0] i-0123456789abcdef0
+terraform import aws_lb.main arn:aws:elasticloadbalancing:...
+
+# Multi-workspace strategy
+resource "aws_instance" "web" {
+  count         = terraform.workspace == "prod" ? 5 : 2
+  instance_type = terraform.workspace == "prod" ? "m5.large" : "t3.micro"
+  
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes = [
+      ami, # Prevent AMI updates in production
+    ]
+  }
+}
+```
+
+### **2. Cross-Account Resource Dependencies**
+**Scenario:** You need to provision resources in Account A that depend on networking components in Account B, while maintaining least-privilege access and ensuring Account B teams can modify their infrastructure without breaking Account A's dependencies.
+
+**Question:** Implement a solution that handles cross-account dependencies, permission management, and change coordination.
+
+**Solution Framework:**
+```hcl
+# Account B - Networking (shared services)
+resource "aws_vpc_peering_connection_accepter" "cross_account" {
+  vpc_peering_connection_id = var.peering_connection_id
+  auto_accept               = true
+  
+  tags = {
+    Side = "Accepter"
+    Name = "cross-account-peering"
+  }
+}
+
+# Output for cross-account consumption
+output "vpc_id" {
+  value = aws_vpc.shared.id
+}
+
+output "private_subnet_ids" {
+  value = aws_subnet.private[*].id
+}
+
+# Account A - Application infrastructure
+data "terraform_remote_state" "networking" {
+  backend = "s3"
+  config = {
+    bucket = "shared-terraform-state"
+    key    = "networking/terraform.tfstate"
+    region = "us-west-2"
+    
+    # Cross-account role assumption
+    role_arn = "arn:aws:iam::ACCOUNT-B:role/TerraformCrossAccountRole"
+  }
+}
+
+resource "aws_instance" "app_servers" {
+  count           = 3
+  subnet_id       = data.terraform_remote_state.networking.outputs.private_subnet_ids[count.index]
+  security_groups = [aws_security_group.app.id]
+  
+  # Dependency management
+  depends_on = [data.terraform_remote_state.networking]
+}
+```
+
+### **3. Terraform Sentinel Advanced Policy Enforcement**
+**Scenario:** Your organization requires policies that prevent creation of resources outside business hours, enforce cost thresholds based on resource combinations, and ensure compliance with custom tagging schemes that vary by environment and team.
+
+**Question:** Create Sentinel policies that handle these complex business rules while maintaining development velocity.
+
+**Solution Framework:**
+```python
+import "time"
+import "tfplan/v2" as tfplan
+import "decimal"
+
+# Policy: Restrict expensive resources outside business hours
+business_hours_restriction = rule {
+    time.now.hour >= 9 and time.now.hour = 1 and time.now.weekday  audit-results.json
+
+# Stage 2: Vulnerability scanning stage
+FROM aquasec/trivy:latest AS vulnerability-scanner
+COPY --from=dependency-scanner /audit-results.json .
+RUN trivy fs --format json --output vulnerability-report.json /
+
+# Stage 3: Build stage
+FROM node:18-alpine AS builder
+WORKDIR /app
+
+# Create non-root user with specific UID
+RUN addgroup -g 10001 -S appgroup && \
+    adduser -u 10001 -S appuser -G appgroup
+
+# Install dependencies
+COPY package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+COPY src/ ./src/
+RUN npm run build
+
+# Stage 4: Runtime image
+FROM alpine:3.18 AS runtime
+RUN apk add --no-cache nodejs npm
+
+# Create application directory
+WORKDIR /app
+
+# Copy non-root user from builder
+RUN addgroup -g 10001 -S appgroup && \
+    adduser -u 10001 -S appuser -G appgroup
+
+# Copy application files
+COPY --from=builder --chown=appuser:appgroup /app/dist ./dist
+COPY --from=builder --chown=appuser:appgroup /app/node_modules ./node_modules
+
+# Set up proper file permissions
+RUN chmod -R 755 /app && \
+    chmod -R 644 /app/dist/* && \
+    chmod 755 /app/dist
+
+# Security hardening
+RUN rm -rf /tmp/* /var/cache/apk/* && \
+    rm -rf /usr/share/man /usr/share/doc
+
+# Switch to non-root user
+USER appuser:appgroup
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node healthcheck.js || exit 1
+
+EXPOSE 3000
+CMD ["node", "dist/server.js"]
+```
+
+```yaml
+# Docker Compose with security constraints
+version: '3.8'
+services:
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+      - seccomp:seccomp-profile.json
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 20000
+        hard: 40000
+    environment:
+      - NODE_ENV=production
+    secrets:
+      - db_password
+      - api_key
+    networks:
+      - app-network
+    
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  api_key:
+    file: ./secrets/api_key.txt
+
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+```
+
+### **7. Runtime Security with Behavioral Monitoring**
+**Scenario:** You need to detect and respond to runtime anomalies in containerized applications, including process injection, unusual network connections, and file system modifications outside expected patterns.
+
+**Question:** Implement a runtime security monitoring system that can detect and automatically respond to threats.
+
+**Solution Framework:**
+```yaml
+# Falco rules for runtime security
+- rule: Suspicious Process Activity in Container  
+  desc: Detect suspicious process execution patterns
+  condition: >
+    spawned_process and container and
+    (proc.name in (nc, netcat, curl, wget, nmap) or
+     proc.args contains "bash -i" or
+     proc.args contains "/dev/tcp" or
+     proc.args contains "python -c")
+  output: >
+    Suspicious process activity (user=%user.name user_uid=%user.uid command=%proc.cmdline 
+    container_id=%container.id container_name=%container.name image=%container.image.repository)
+  priority: HIGH
+
+- rule: Container File System Modification
+  desc: Detect unexpected file system modifications
+  condition: >
+    container and modify and
+    not proc.name in (node, npm, python, java) and
+    fd.name startswith /app
+  output: >
+    Unexpected file modification in container (user=%user.name command=%proc.cmdline 
+    file=%fd.name container=%container.name)
+  priority: MEDIUM
+
+# Kubernetes DaemonSet for Falco
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: falco
+  namespace: falco-system
+spec:
+  selector:
+    matchLabels:
+      app: falco
+  template:
+    metadata:
+      labels:
+        app: falco
+    spec:
+      serviceAccount: falco-account
+      hostNetwork: true
+      hostPID: true
+      containers:
+      - name: falco
+        image: falcosecurity/falco:0.35.0
+        securityContext:
+          privileged: true
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+          requests:
+            memory: "256Mi" 
+            cpu: "100m"
+        volumeMounts:
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: boot
+          mountPath: /host/boot
+          readOnly: true
+        - name: lib-modules
+          mountPath: /host/lib/modules
+          readOnly: true
+        - name: dev
+          mountPath: /host/dev
+        - name: falco-config
+          mountPath: /etc/falco
+      volumes:
+      - name: proc
+        hostPath:
+          path: /proc
+      - name: boot  
+        hostPath:
+          path: /boot
+      - name: lib-modules
+        hostPath:
+          path: /lib/modules
+      - name: dev
+        hostPath:
+          path: /dev
+      - name: falco-config
+        configMap:
+          name: falco-config
+```
+
+## **AWS Advanced Security Scenarios**
+
+### **8. Cross-Account IAM with Complex Policy Boundaries**
+**Scenario:** Your organization has 50+ AWS accounts in an Organization. You need to implement a permission system where developers can assume roles across accounts based on team membership, but with permissions boundaries that prevent privilege escalation and ensure compliance with SOC2 requirements.
+
+**Question:** Design an IAM strategy that handles cross-account access, permissions boundaries, and audit requirements.
+
+**Solution Framework:**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AssumeRoleWithConditions",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::CENTRAL-ACCOUNT:role/DeveloperRole"
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": {
+          "sts:ExternalId": "${aws:userid}",
+          "aws:RequestedRegion": ["us-east-1", "us-west-2"]
+        },
+        "DateGreaterThan": {
+          "aws:CurrentTime": "2024-01-01T00:00:00Z"
+        },
+        "StringLike": {
+          "saml:department": ["Engineering", "DevOps"]
+        },
+        "Bool": {
+          "aws:MultiFactorAuthPresent": "true"
+        },
+        "NumericLessThan": {
+          "aws:MultiFactorAuthAge": "3600"
+        }
+      }
+    }
+  ]
+}
+```
+
+```json
+# Permissions Boundary Policy
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowedServices",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:*",
+        "s3:*",
+        "rds:Describe*",
+        "rds:List*",
+        "cloudwatch:*",
+        "logs:*"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": ["us-east-1", "us-west-2"]
+        }
+      }
+    },
+    {
+      "Sid": "DenyPrivilegedActions",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:AttachRolePolicy",
+        "iam:PutRolePermissionsBoundary",
+        "sts:AssumeRole"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringNotEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::ACCOUNT:policy/DeveloperBoundary"
+        }
+      }
+    },
+    {
+      "Sid": "AllowAssumeOnlyApprovedRoles",
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": [
+        "arn:aws:iam::*:role/CrossAccountDeveloper*",
+        "arn:aws:iam::*:role/ApplicationRole*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Department": "${saml:department}",
+          "aws:RequestTag/Project": "${saml:project}"
+        }
+      }
+    }
+  ]
+}
+```
+
+### **9. Advanced S3 Security with VPC Endpoints and Encryption**
+**Scenario:** You're storing sensitive healthcare data in S3 that must comply with HIPAA. Access should only be possible from specific VPCs, require encryption in transit and at rest, and maintain detailed audit logs with real-time anomaly detection.
+
+**Question:** Implement a comprehensive S3 security architecture that meets compliance and operational requirements.
+
+**Solution Framework:**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RequireSSLRequestsOnly",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::sensitive-healthcare-data",
+        "arn:aws:s3:::sensitive-healthcare-data/*"
+      ],
+      "Condition": {
+        "Bool": {
+          "aws:SecureTransport": "false"
+        }
+      }
+    },
+    {
+      "Sid": "RestrictToVPCEndpoint",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::sensitive-healthcare-data",
+        "arn:aws:s3:::sensitive-healthcare-data/*"
+      ],
+      "Condition": {
+        "StringNotEquals": {
+          "aws:SourceVpce": ["vpce-12345678", "vpce-87654321"]
+        }
+      }
+    },
+    {
+      "Sid": "RequireEncryption",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::sensitive-healthcare-data/*",
+      "Condition": {
+        "StringNotEquals": {
+          "s3:x-amz-server-side-encryption": "aws:kms",
+          "s3:x-amz-server-side-encryption-aws-kms-key-id": "arn:aws:kms:us-east-1:ACCOUNT:key/12345678-1234-1234-1234-123456789012"
+        }
+      }
+    },
+    {
+      "Sid": "TimeBasedAccess",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::ACCOUNT:role/HealthcareDataProcessor"
+      },
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::sensitive-healthcare-data/*",
+      "Condition": {
+        "DateGreaterThan": {
+          "aws:CurrentTime": "2024-01-01T09:00:00Z"
+        },
+        "DateLessThan": {
+          "aws:CurrentTime": "2024-12-31T17:00:00Z"
+        },
+        "IpAddress": {
+          "aws:SourceIp": ["10.0.0.0/8", "172.16.0.0/12"]
+        }
+      }
+    }
+  ]
+}
+```
+
+## **Azure Policy Advanced Governance**
+
+### **10. Dynamic Policy Assignment with Remediation**
+**Scenario:** Your organization requires policies that automatically scale based on resource criticality, apply different compliance requirements based on data classification tags, and can automatically remediate non-compliant resources without disrupting operations.
+
+**Question:** Create Azure Policies that implement dynamic governance with intelligent remediation.
+
+**Solution Framework:**
+```json
+{
+  "properties": {
+    "displayName": "Dynamic SQL Database Encryption Based on Data Classification",
+    "description": "Automatically configures SQL database encryption based on data classification tags",
+    "policyType": "Custom",
+    "mode": "Indexed",
+    "parameters": {
+      "dataClassificationLevels": {
+        "type": "Object",
+        "metadata": {
+          "displayName": "Data Classification Levels",
+          "description": "Object mapping data classification to security requirements"
+        },
+        "defaultValue": {
+          "public": {
+            "encryptionRequired": false,
+            "auditingRequired": true
+          },
+          "internal": {
+            "encryptionRequired": true,
+            "auditingRequired": true,
+            "keyVaultRequired": false
+          },
+          "confidential": {
+            "encryptionRequired": true,
+            "auditingRequired": true,
+            "keyVaultRequired": true,
+            "privateEndpointRequired": true
+          },
+          "restricted": {
+            "encryptionRequired": true,
+            "auditingRequired": true,
+            "keyVaultRequired": true,
+            "privateEndpointRequired": true,
+            "advancedThreatProtection": true
+          }
+        }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.Sql/servers/databases"
+          },
+          {
+            "field": "tags['DataClassification']",
+            "exists": true
+          }
+        ]
+      },
+      "then": {
+        "effect": "deployIfNotExists",
+        "details": {
+          "type": "Microsoft.Sql/servers/databases/transparentDataEncryption",
+          "name": "current",
+          "existenceCondition": {
+            "field": "Microsoft.Sql/servers/databases/transparentDataEncryption/state",
+            "equals": "Enabled"
+          },
+          "deployment": {
+            "properties": {
+              "mode": "Incremental",
+              "template": {
+                "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                "contentVersion": "1.0.0.0",
+                "parameters": {
+                  "serverName": {
+                    "type": "string"
+                  },
+                  "databaseName": {
+                    "type": "string"
+                  },
+                  "dataClassification": {
+                    "type": "string"
+                  }
+                },
+                "resources": [
+                  {
+                    "type": "Microsoft.Sql/servers/databases/transparentDataEncryption",
+                    "apiVersion": "2021-02-01-preview",
+                    "name": "[concat(parameters('serverName'), '/', parameters('databaseName'), '/current')]",
+                    "properties": {
+                      "state": "Enabled"
+                    }
+                  }
+                ]
+              },
+              "parameters": {
+                "serverName": {
+                  "value": "[split(field('fullName'),'/')[0]]"
+                },
+                "databaseName": {
+                  "value": "[field('name')]"
+                },
+                "dataClassification": {
+                  "value": "[field('tags[DataClassification]')]"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## **CI/CD Advanced Security Integration**
+
+### **11. Pipeline Security with Dynamic Threat Detection**
+**Scenario:** Your CI/CD pipeline processes code from multiple repositories, deploys to various environments, and must detect supply chain attacks, credential theft, and malicious code injection while maintaining deployment velocity.
+
+**Question:** Design a security-integrated CI/CD pipeline that provides comprehensive threat detection without impeding development workflows.
+
+**Solution Framework:**
+```yaml
+# Advanced GitHub Actions workflow with security integration
+name: Secure CI/CD Pipeline
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+  id-token: write
+
+jobs:
+  security-scanning:
+    runs-on: ubuntu-latest
+    environment: security-scanning
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for security analysis
+        
+    # Supply chain verification
+    - name: Verify commit signatures
+      run: |
+        git log --show-signature -1
+        if ! git log --pretty="format:%G?" -1 | grep -q "G"; then
+          echo "Commit not properly signed"
+          exit 1
+        fi
+        
+    # Secret scanning
+    - name: Secret scanning
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: ${{ github.event.repository.default_branch }}
+        head: HEAD
+        extra_args: --debug --only-verified
+        
+    # Dependency vulnerability scanning
+    - name: Run Snyk to check for vulnerabilities
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high --fail-on=all
+        
+    # SAST scanning
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/init@v2
+      with:
+        languages: javascript, python
+        queries: security-extended,security-and-quality
+        
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v2
+      
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      
+    # Infrastructure as Code scanning
+    - name: Terraform security scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: './terraform'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+  build-and-deploy:
+    needs: security-scanning
+    runs-on: ubuntu-latest
+    environment: 
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+      
+    steps:
+    - uses: actions/checkout@v4
+    
+    # Container security scanning
+    - name: Build Docker image
+      run: |
+        docker build -t myapp:${{ github.sha }} .
+        
+    - name: Scan container image
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'myapp:${{ github.sha }}'
+        format: 'table'
+        exit-code: '1'
+        ignore-unfixed: true
+        severity: 'CRITICAL,HIGH'
+        
+    # Sign container image
+    - name: Install cosign
+      uses: sigstore/cosign-installer@v3
+      
+    - name: Sign container image
+      run: |
+        cosign sign --yes myapp:${{ github.sha }}
+        
+    # Deploy with verification
+    - name: Deploy to Kubernetes
+      run: |
+        # Verify image signature before deployment
+        cosign verify myapp:${{ github.sha }} \
+          --certificate-identity-regexp=".*@company\.com" \
+          --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
+          
+        # Deploy with admission controller verification
+        kubectl apply -f k8s/manifests/
+        
+    # Runtime security monitoring
+    - name: Configure runtime monitoring
+      run: |
+        # Deploy Falco rules for the new deployment
+        kubectl apply -f security/falco-rules.yaml
+        
+        # Set up continuous monitoring alerts
+        curl -X POST "$SECURITY_WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -d '{"deployment": "myapp", "version": "${{ github.sha }}", "environment": "${{ github.ref }}"}'
+```
+
+### **12. Multi-Environment Security Gates**
+**Scenario:** Your pipeline deploys to development, staging, and production environments with different security requirements. Production requires manual security approval, staging needs automated penetration testing, and development allows faster iteration with basic security checks.
+
+**Question:** Implement environment-specific security gates that balance security with development velocity.
+
+**Solution Framework:**
+```yaml
+# Azure DevOps pipeline with environment-specific security
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+      - feature/*
+
+variables:
+  - name: isMain
+    value: ${{ eq(variables['Build.SourceBranch'], 'refs/heads/main') }}
+  - name: isDevelop  
+    value: ${{ eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}
+
+stages:
+- stage: SecurityValidation
+  displayName: 'Security Validation'
+  jobs:
+  - job: BasicSecurityChecks
+    displayName: 'Basic Security Scanning'
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        version: '6.x'
+        
+    # Always run basic security checks
+    - task: SonarCloudPrepare@1
+      inputs:
+        SonarCloud: 'SonarCloud'
+        organization: 'myorg'
+        scannerMode: 'MSBuild'
+        projectKey: 'myproject'
+        extraProperties: |
+          sonar.cs.vscoveragexml.reportsPaths=$(Agent.TempDirectory)/**/coverage.xml
+          
+    - task: WhiteSource@21
+      inputs:
+        cwd: '$(System.DefaultWorkingDirectory)'
+        projectName: 'MyProject'
+        
+  - job: AdvancedSecurityChecks
+    displayName: 'Advanced Security Scanning'  
+    condition: or(eq(variables.isMain, true), eq(variables.isDevelop, true))
+    dependsOn: BasicSecurityChecks
+    steps:
+    - task: ContainerScan@0
+      inputs:
+        containerRegistryType: 'Container Registry'
+        dockerRegistryEndpoint: 'myregistry'
+        repository: 'myapp'
+        tag: '$(Build.BuildId)'
+        includeLatestTag: false
+        
+    - task: AzureKeyVault@2
+      inputs:
+        azureSubscription: 'Azure Subscription'
+        KeyVaultName: 'security-vault'
+        SecretsFilter: 'snyk-token,checkmarx-secret'
+        
+    # Advanced static analysis for staging/production
+    - powershell: |
+        $headers = @{
+            'Authorization' = "Bearer $(snyk-token)"
+            'Content-Type' = 'application/json'
+        }
+        
+        $response = Invoke-RestMethod -Uri "https://snyk.io/api/v1/test" -Method Post -Headers $headers -Body $body
+        
+        if ($response.vulnerabilities.Count -gt 0) {
+            $criticalVulns = $response.vulnerabilities | Where-Object { $_.severity -eq "high" -or $_.severity -eq "critical" }
+            if ($criticalVulns.Count -gt 0) {
+                Write-Error "Critical vulnerabilities found: $($criticalVulns.Count)"
+                exit 1
+            }
+        }
+      displayName: 'Advanced Vulnerability Assessment'
+
+- stage: DeployDevelopment
+  displayName: 'Deploy to Development'
+  condition: and(succeeded(), ne(variables.isMain, true))
+  dependsOn: SecurityValidation
+  jobs:
+  - deployment: DeployDev
+    displayName: 'Development Deployment'
+    environment: 'development'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: KubernetesManifest@0
+            inputs:
+              action: 'deploy'
+              kubernetesServiceConnection: 'k8s-dev'
+              namespace: 'development'
+              manifests: 'k8s/dev/*.yaml'
+
+- stage: DeployStaging  
+  displayName: 'Deploy to Staging'
+  condition: and(succeeded(), eq(variables.isDevelop, true))
+  dependsOn: SecurityValidation
+  jobs:
+  - deployment: DeployStaging
+    displayName: 'Staging Deployment'
+    environment: 'staging'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: KubernetesManifest@0
+            inputs:
+              action: 'deploy'
+              kubernetesServiceConnection: 'k8s-staging'
+              namespace: 'staging'
+              manifests: 'k8s/staging/*.yaml'
+              
+  - job: PenetrationTesting
+    displayName: 'Automated Penetration Testing'
+    dependsOn: DeployStaging
+    steps:
+    - task: OWASP-ZAP-Scanner@1
+      inputs:
+        ZAPApiUrl: 'http://staging-app.company.com'
+        targetUrl: 'http://staging-app.company.com'
+        
+    - powershell: |
+        # Custom security validation for staging
+        $securityChecks = @(
+            'SSL certificate validation',
+            'Authentication bypass attempts', 
+            'SQL injection testing',
+            'XSS vulnerability scanning'
+        )
+        
+        foreach ($check in $securityChecks) {
+            Write-Host "Running: $check"
+            # Implement security check logic
+        }
+      displayName: 'Additional Security Validation'
+
+- stage: DeployProduction
+  displayName: 'Deploy to Production'  
+  condition: and(succeeded(), eq(variables.isMain, true))
+  dependsOn: SecurityValidation
+  jobs:
+  - deployment: DeployProduction
+    displayName: 'Production Deployment'
+    environment: 'production'
+    strategy:
+      runOnce:
+        preDeploy:
+          steps:
+          - task: ManualValidation@0
+            inputs:
+              notifyUsers: 'security-team@company.com'
+              instructions: 'Please review security scan results and approve production deployment'
+              timeoutInMinutes: 1440 # 24 hours
+              
+        deploy:
+          steps:
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: 'Production Subscription'
+              scriptType: 'ps'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                # Blue-green deployment with security validation
+                az aks get-credentials --resource-group prod-rg --name prod-cluster
+                
+                # Deploy to blue environment first
+                kubectl apply -f k8s/prod/blue/ --namespace=blue-prod
+                
+                # Run security validation against blue environment
+                $healthCheck = Invoke-RestMethod -Uri "https://blue-prod.company.com/health"
+                if ($healthCheck.status -ne "healthy") {
+                    throw "Health check failed on blue environment"
+                }
+                
+                # Switch traffic to blue environment
+                kubectl patch service app-service -p '{"spec":{"selector":{"version":"blue"}}}' -n production
+```
+
+These advanced scenarios test deep understanding of security principles, infrastructure management, and operational excellence in complex, production-grade environments. Each question requires synthesizing multiple technologies and security concepts to solve real-world challenges that senior engineers face daily.[4]
+
+The solutions demonstrate not just technical implementation but also consideration of business requirements, compliance needs, and operational constraints that make cloud engineering complex and rewarding.[2][5][6][7]
+
+[1] https://minimaldevops.com/terraform-sentinel-059b1754c62d
+[2] https://livingdevops.com/devops/20-scenario-based-terraform-questions-with-answers-for-devops-interviews/
+[3] https://trilio.io/kubernetes-best-practices/kubernetes-rbac/
+[4] https://spacelift.io/blog/iam-policy
+[5] https://spacelift.io/blog/terraform-policy-as-code
+[6] https://duplocloud.com/blog/5-best-practices-for-implementing-effective-multi-cloud-governance/
+[7] https://www.corestack.io/blog/multi-cloud-management-platform/
+[8] https://policyascode.dev/guides/azure-policy-guide/
+[9] https://squareops.com/blog/terraform-state-management/
+[10] https://www.youtube.com/watch?v=YZfA-TqkcV0
+[11] https://www.youtube.com/watch?v=uUJwakKDLgY
+[12] https://blog.palantir.com/protecting-terraform-resources-with-sentinel-c7ba75946b95
+[13] https://learn.microsoft.com/en-us/azure/governance/policy/overview
+[14] https://kodekloud.com/blog/manage-terraform-state/
+[15] https://github.com/hashicorp/terraform-sentinel-policies
+[16] https://www.youtube.com/watch?v=4wGns611G4w
+[17] https://spacelift.io/blog/terraform-state
+[18] https://www.hashicorp.com/en/resources/writing-and-testing-sentinel-policies-for-terraform
+[19] https://www.youtube.com/watch?v=fhIn_kHz4hk
+[20] https://developer.hashicorp.com/terraform/tutorials/state/state-cli
+[21] https://michaeldurkan.com/2023/03/14/the-a-z-of-azure-policy/
+[22] https://www.xavor.com/blog/terraform-state-management/
+[23] https://developer.hashicorp.com/vault/tutorials/policies/sentinel-policy-examples
+[24] https://dev.to/beingwizard/100-days-of-cloud-day-8-azure-resource-locks-and-azure-policy-1kin
+[25] https://www.sonatype.com/resources/guides/docker-security-best-practices
+[26] https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html
+[27] https://www.plural.sh/blog/kubernetes-rbac-guide/
+[28] https://betterstack.com/community/guides/scaling-docker/docker-security-best-practices/
+[29] https://aws.plainenglish.io/eks-rbac-deep-dive-securing-your-cluster-with-real-world-use-cases-a1b191341024
+[30] https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html
+[31] https://aws.amazon.com/blogs/security/iam-policy-types-how-and-when-to-use-them/
+[32] https://www.wiz.io/academy/kubernetes-rbac-best-practices
+[33] https://www.sysdig.com/blog/7-docker-security-vulnerabilities
+[34] https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_examples.html
+[35] https://overcast.blog/managing-role-based-access-control-rbac-in-kubernetes-a-guide-79d5ed5cbdf6
+[36] https://www.tigera.io/learn/guides/container-security-best-practices/docker-security/
+[37] https://docs.aws.amazon.com/bedrock/latest/userguide/security_iam_id-based-policy-examples.html
+[38] https://blog.devops.dev/kubernetes-day-22-advanced-rbac-and-pod-security-83f2c8b572eb
+[39] https://docs.docker.com/engine/security/
+[40] https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html
+[41] https://www.loft.sh/blog/kubernetes-multi-tenancy-and-rbac-advanced-scenarios-and-customization
+[42] https://www.aquasec.com/blog/docker-security-best-practices/
+[43] https://cycode.com/blog/ci-cd-pipeline-security-best-practices/
+[44] https://www.checkpoint.com/cyber-hub/cyber-security/what-is-incident-response/cloud-incident-response/
+[45] https://codefresh.io/learn/ci-cd/ci-cd-security-7-risks-and-what-you-can-do-about-them/
+[46] https://docs.aws.amazon.com/security-ir/latest/userguide/introduction.html
+[47] https://www.paloaltonetworks.com/cyberpedia/what-is-ci-cd-security
+[48] https://sysdig.com/blog/streamline-incident-response-in-the-cloud-with-inline-response-actions/
+[49] https://www.tatacommunications.com/knowledge-base/multi-cloud-security-fameworks-best-practices/
+[50] https://www.jit.io/resources/devsecops/securing-cicd-pipelines-common-misconfigurations-and-exploits-paths
+[51] https://sbscyber.com/blog/top-5-most-common-incident-response-scenarios
+[52] https://www.wiz.io/academy/multi-cloud-security
+[53] https://www.sentinelone.com/cybersecurity-101/cloud-security/ci-cd-security-best-practices/
+[54] https://www.wiz.io/academy/cloud-incident-response
+[55] https://cloudsecurityalliance.org/blog/2022/02/17/multi-cloud-security
+[56] https://www.practical-devsecops.com/protecting-against-poisoned-pipeline-execution-ci-cd-security/
+[57] https://www.paloaltonetworks.com/cyberpedia/unit-42-cloud-incident-response
+[58] https://www.safepaas.com/articles/multi-cloud-security-and-governance-challenges/
+[59] https://www.linkedin.com/pulse/day-77-advanced-cicd-pipelines-concepts-ayushi-tiwari-iqevf
+[60] https://www.logsign.com/blog/top-15-incident-response-use-cases/
+
+
+
+# Advanced Cloud & DevOps Scenario-Based Questions
+
+## Cloud Architecture & Design Patterns
+
+### Scenario 1: Multi-Region Disaster Recovery
+Your e-commerce application serves 10M+ users globally. The primary region (us-east-1) experiences a complete outage. Your RTO is 15 minutes and RPO is 5 minutes.
+
+**Questions:**
+- How would you design a cross-region failover strategy using AWS Route 53, ALB, and RDS?
+- What are the data consistency challenges when failing over a write-heavy database?
+- How would you handle in-flight transactions during failover?
+- Design a cost-effective backup strategy that meets the RPO requirement.
+
+### Scenario 2: Hybrid Cloud Integration
+A financial institution needs to keep sensitive data on-premises but wants to leverage cloud for compute-intensive analytics workloads.
+
+**Questions:**
+- Design a secure hybrid architecture using AWS Direct Connect/Azure ExpressRoute.
+- How would you implement data classification and ensure sensitive data never leaves on-premises?
+- What are the networking considerations for low-latency connectivity?
+- How would you handle identity federation between on-premises AD and cloud IAM?
+
+## Terraform Deep Dive Scenarios
+
+### Scenario 3: Complex State Management
+You're managing infrastructure for 50+ microservices across dev/staging/prod environments with multiple teams.
+
+**Questions:**
+- Design a Terraform state management strategy using remote backends.
+- How would you implement workspace isolation while sharing common modules?
+- A developer accidentally runs `terraform destroy` on production. What's your recovery strategy?
+- How would you implement state locking in a multi-team environment to prevent conflicts?
+
+### Scenario 4: Advanced Module Architecture
+You need to create reusable Terraform modules for a multi-tenant SaaS platform where each tenant has isolated infrastructure.
+
+**Questions:**
+- Design a module structure that supports tenant isolation while maximizing code reuse.
+- How would you handle conditional resource creation based on environment variables?
+- Implement a versioning strategy for modules used across multiple teams.
+- How would you validate module inputs and provide meaningful error messages?
+
+### Scenario 5: Terraform Sentinel Governance
+Your organization needs to enforce compliance policies across all Terraform deployments.
+
+**Questions:**
+- Write a Sentinel policy that ensures all S3 buckets have encryption enabled and public access blocked.
+- Create a policy that restricts EC2 instance types based on environment (dev can only use t3.micro/small).
+- How would you implement cost controls to prevent resources above certain thresholds?
+- Design a policy that enforces mandatory tags (Owner, Environment, Project) on all resources.
+
+## Cloud Security Scenarios
+
+### Scenario 6: Zero Trust Architecture Implementation
+Design a zero-trust security model for a microservices application running on Kubernetes.
+
+**Questions:**
+- How would you implement network segmentation using Kubernetes Network Policies?
+- Design an authentication/authorization flow using service mesh (Istio) with mTLS.
+- How would you implement runtime security monitoring and threat detection?
+- What's your strategy for secrets management across microservices?
+
+### Scenario 7: Compliance and Audit Requirements
+Your healthcare application must comply with HIPAA, SOC 2, and GDPR requirements.
+
+**Questions:**
+- Design a logging and monitoring strategy that captures audit trails without exposing PHI.
+- How would you implement data encryption at rest and in transit across all services?
+- Create an access control matrix for different user roles and data sensitivity levels.
+- How would you handle data residency requirements for GDPR compliance?
+
+## CI/CD Pipeline Scenarios
+
+### Scenario 8: Complex Deployment Pipeline
+You have a microservices application with 20+ services, each with different technology stacks and deployment requirements.
+
+**Questions:**
+- Design a GitOps-based CI/CD pipeline that supports independent service deployments.
+- How would you handle database migrations in a zero-downtime deployment scenario?
+- Implement a testing strategy that includes unit, integration, contract, and end-to-end tests.
+- How would you manage feature flags and progressive rollouts across services?
+
+### Scenario 9: Security-First CI/CD
+Your pipeline must scan for vulnerabilities, secrets, and compliance violations at every stage.
+
+**Questions:**
+- Design a security scanning strategy that includes SAST, DAST, container scanning, and dependency checks.
+- How would you prevent secrets from being committed to version control?
+- Implement a policy that automatically fails builds if critical vulnerabilities are found.
+- How would you handle vulnerability remediation across multiple environments?
+
+## Docker Advanced Scenarios
+
+### Scenario 10: Multi-Stage Production Optimization
+Your Node.js application Docker image is 2GB and takes 10 minutes to build and deploy.
+
+**Questions:**
+- Design a multi-stage Dockerfile that reduces image size to under 200MB.
+- How would you implement layer caching strategies to reduce build times?
+- What security hardening steps would you implement in the container image?
+- How would you handle application secrets and configuration in containers?
+
+### Scenario 11: Container Security Hardening
+You need to run containers with maximum security for a financial application.
+
+**Questions:**
+- How would you implement rootless containers and user namespace remapping?
+- Design a strategy for scanning container images for vulnerabilities in the CI pipeline.
+- How would you implement runtime protection using tools like Falco or Twistlock?
+- What are the considerations for running containers in a PCI-DSS compliant environment?
+
+## Kubernetes Complex Scenarios
+
+### Scenario 12: Resource Management and Autoscaling
+Your application experiences traffic spikes of 10x normal load during flash sales.
+
+**Questions:**
+- Design an HPA/VPA strategy that handles rapid scaling without resource contention.
+- How would you implement cluster autoscaling with mixed instance types and spot instances?
+- What's your strategy for resource quotas and limits across different namespaces?
+- How would you handle pod disruption budgets during node maintenance?
+
+### Scenario 13: Service Mesh Implementation
+Implement a service mesh architecture for 50+ microservices with complex communication patterns.
+
+**Questions:**
+- Compare Istio vs Linkerd vs Consul Connect for your use case. What are the trade-offs?
+- How would you implement progressive traffic shifting for canary deployments?
+- Design a security policy that enforces mTLS and zero-trust networking.
+- How would you handle observability (tracing, metrics, logging) across the mesh?
+
+### Scenario 14: StatefulSet and Persistent Storage
+You need to run a distributed database (like Cassandra or MongoDB) on Kubernetes.
+
+**Questions:**
+- Design a StatefulSet configuration with proper persistent volume management.
+- How would you handle database initialization, clustering, and data replication?
+- What's your backup and disaster recovery strategy for stateful workloads?
+- How would you perform rolling updates without data loss or downtime?
+
+## Azure Policy Advanced Scenarios
+
+### Scenario 15: Enterprise Governance Framework
+Implement governance policies for a large enterprise with 100+ subscriptions and strict compliance requirements.
+
+**Questions:**
+- Design a policy hierarchy using Management Groups for different business units.
+- Create policies that enforce resource naming conventions and mandatory tags.
+- How would you implement policies that restrict resource deployment to specific regions?
+- Design a policy that automatically applies security configurations to newly created resources.
+
+### Scenario 16: Cost Management Through Policies
+Your cloud spend has increased 300% in 6 months due to ungoverned resource creation.
+
+**Questions:**
+- Create policies that prevent deployment of expensive resources without approval.
+- How would you implement automatic resource cleanup for unused resources?
+- Design a policy framework that enforces budget limits at the subscription level.
+- How would you balance developer agility with cost control through policies?
+
+## AWS Advanced Scenarios
+
+### Scenario 17: Serverless Architecture at Scale
+Design a serverless application that processes 1M+ events per hour with sub-100ms latency requirements.
+
+**Questions:**
+- How would you handle Lambda cold starts and implement provisioned concurrency?
+- Design an event-driven architecture using EventBridge, SQS, and Step Functions.
+- How would you implement error handling and dead letter queues for failed events?
+- What's your monitoring and alerting strategy for serverless applications?
+
+### Scenario 18: Data Lake and Analytics Platform
+Build a data platform that ingests TB of data daily from multiple sources and supports real-time analytics.
+
+**Questions:**
+- Design a data lake architecture using S3, Glue, Athena, and Kinesis.
+- How would you implement data cataloging and schema evolution?
+- What's your strategy for data partitioning and query optimization?
+- How would you ensure data quality and implement data governance?
+
+### Scenario 19: AWS Organizations and Account Strategy
+Manage AWS infrastructure for a multinational corporation with strict regulatory requirements.
+
+**Questions:**
+- Design an AWS Organizations structure with SCPs for different business units.
+- How would you implement cross-account resource sharing while maintaining isolation?
+- Create a strategy for centralized logging and monitoring across all accounts.
+- How would you handle billing allocation and cost optimization at scale?
+
+## Azure Advanced Scenarios
+
+### Scenario 20: Azure Arc and Hybrid Management
+Manage Kubernetes clusters across on-premises, Azure, AWS, and GCP using Azure Arc.
+
+**Questions:**
+- How would you onboard non-Azure Kubernetes clusters to Azure Arc?
+- Implement GitOps deployment strategies across hybrid environments.
+- How would you enforce consistent security policies across all clusters?
+- Design a monitoring strategy that provides unified visibility across all environments.
+
+### Scenario 21: Azure DevOps Enterprise Implementation
+Implement Azure DevOps for 500+ developers across multiple time zones and projects.
+
+**Questions:**
+- Design a branching strategy that supports parallel development and release cycles.
+- How would you implement work item tracking and reporting across multiple teams?
+- Create a pipeline template strategy that ensures consistency while allowing customization.
+- How would you handle security and compliance scanning in Azure Pipelines?
+
+## Cross-Platform Integration Scenarios
+
+### Scenario 22: Multi-Cloud Kubernetes Management
+Your organization uses EKS, AKS, and GKE clusters that need unified management and deployment.
+
+**Questions:**
+- Design a GitOps strategy that works across all three cloud providers.
+- How would you handle cluster-specific configurations while maintaining consistency?
+- Implement a service discovery mechanism that works across cloud boundaries.
+- What's your strategy for cost optimization and resource allocation across clouds?
+
+### Scenario 23: Disaster Recovery Across Cloud Providers
+Implement a disaster recovery solution that fails over from AWS to Azure.
+
+**Questions:**
+- Design a data replication strategy between AWS RDS and Azure SQL Database.
+- How would you handle DNS failover and traffic routing during a disaster?
+- What are the challenges with maintaining application state during cross-cloud failover?
+- How would you test the disaster recovery plan without impacting production?
+
+## Performance and Optimization Scenarios
+
+### Scenario 24: Container Performance Optimization
+Your containerized application experiences performance degradation under high load.
+
+**Questions:**
+- How would you profile CPU, memory, and I/O usage within containers?
+- Design a strategy for optimizing container resource allocation and limits.
+- How would you implement application-level caching in a containerized environment?
+- What tools would you use for distributed tracing and performance monitoring?
+
+### Scenario 25: Cloud Cost Optimization
+Your monthly cloud bill is $500K and leadership wants 30% cost reduction without impacting performance.
+
+**Questions:**
+- Design a comprehensive cost analysis and optimization strategy.
+- How would you implement automated resource scheduling and rightsizing?
+- What's your approach to optimizing data transfer and storage costs?
+- How would you balance cost optimization with reliability and performance requirements?
+
+## Troubleshooting and Incident Response
+
+### Scenario 26: Complex Production Incident
+Your Kubernetes cluster experiences cascading failures affecting multiple microservices during peak traffic.
+
+**Questions:**
+- Walk through your incident response process from detection to resolution.
+- How would you identify the root cause when multiple services are failing?
+- What's your strategy for rolling back deployments while preserving data integrity?
+- How would you implement circuit breakers and bulkhead patterns to prevent cascade failures?
+
+### Scenario 27: Security Breach Response
+You discover unauthorized access to your cloud environment with potential data exfiltration.
+
+**Questions:**
+- Outline your immediate response steps to contain the breach.
+- How would you conduct forensic analysis using cloud-native tools?
+- What's your strategy for determining the scope and impact of the breach?
+- How would you implement additional security controls to prevent future incidents?
+
+## Advanced Integration Scenarios
+
+### Scenario 28: Legacy System Modernization
+Migrate a monolithic application running on physical servers to a cloud-native architecture.
+
+**Questions:**
+- Design a strangler fig pattern implementation for gradual migration.
+- How would you extract microservices while maintaining data consistency?
+- What's your strategy for handling distributed transactions during the transition?
+- How would you implement monitoring to compare performance before and after migration?
+
+### Scenario 29: Regulatory Compliance Automation
+Implement automated compliance checking for SOX, PCI-DSS, and GDPR across your entire cloud infrastructure.
+
+**Questions:**
+- Design a compliance scanning framework using cloud-native tools.
+- How would you implement continuous compliance monitoring and alerting?
+- What's your strategy for generating compliance reports for auditors?
+- How would you handle non-compliant resources discovered in production?
+
+### Scenario 30: Advanced Networking
+Implement a global, highly available application with strict latency requirements across multiple cloud providers.
+
+**Questions:**
+- Design a global load balancing strategy using cloud-native and third-party solutions.
+- How would you implement anycast routing for optimal user experience?
+- What's your approach to handling network partitions and split-brain scenarios?
+- How would you optimize for both latency and cost across different regions?
+
+## Answer Guidelines
+
+For each scenario, consider:
+- **Technical Implementation**: Specific tools, configurations, and architectures
+- **Security Implications**: How to maintain security while solving the problem
+- **Scalability Considerations**: How the solution performs under load
+- **Cost Optimization**: Balance between functionality and cost
+- **Monitoring and Observability**: How to ensure visibility into the solution
+- **Disaster Recovery**: How to handle failures and edge cases
+- **Compliance Requirements**: Legal and regulatory considerations
+- **Team Collaboration**: How multiple teams can work with the solution
+
+These scenarios are designed to test not just technical knowledge, but also:
+- Problem-solving approach and methodology
+- Understanding of trade-offs and limitations
+- Real-world implementation experience
+- Ability to balance competing requirements
+- Knowledge of current best practices and emerging patterns
