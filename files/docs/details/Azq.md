@@ -31,3 +31,95 @@ policyresources
     PolicyType = policyType,
     PolicyParameters = policyParameters
 | order by InitiativeName, PolicyName
+
+
+
+Got it — you want to use Azure Resource Graph (ARG) to query and return policy assignments that are linked to a specific policy definition.
+
+Here’s the key part to understand:
+In Azure, policy assignments reference either:
+
+a policyDefinitionId (for individual policies)
+
+or an initiativeDefinitionId (for policy initiatives — a collection of policies).
+
+
+
+---
+
+Example: Azure Resource Graph Query
+
+If you know the Policy Definition ID (or its name), you can run:
+
+PolicyResources
+| where type == 'microsoft.authorization/policyassignments'
+| extend policyDefinitionId = tostring(properties.policyDefinitionId)
+| where policyDefinitionId has "<your-policy-definition-name-or-guid>"
+| project name, id, scope = properties.scope, policyDefinitionId
+
+
+---
+
+For Initiative (Policy Set Definition)
+
+If the definition is an initiative, and you want all assignments that come from it:
+
+PolicyResources
+| where type == 'microsoft.authorization/policyassignments'
+| extend policyDefinitionId = tostring(properties.policyDefinitionId)
+| where policyDefinitionId has "<your-initiative-definition-name-or-guid>"
+| project name, id, scope = properties.scope, policyDefinitionId
+
+
+---
+
+If You Only Have the Display Name
+
+You can first fetch the definition ID, then filter:
+
+// Step 1: Get the policy definition ID
+PolicyResources
+| where type in ('microsoft.authorization/policydefinitions', 'microsoft.authorization/policysetdefinitions')
+| where properties.displayName == "<Your Policy or Initiative Display Name>"
+| project id
+
+// Step 2: Use the ID from above in the assignments query
+PolicyResources
+| where type == 'microsoft.authorization/policyassignments'
+| extend policyDefinitionId = tostring(properties.policyDefinitionId)
+| where policyDefinitionId == "<ID from above>"
+| project name, id, scope = properties.scope
+
+
+---
+
+Note:
+
+PolicyResources in Azure Resource Graph includes both policy definitions and assignments.
+
+You’ll need Reader access at least on the scopes where these policies are assigned.
+
+Run the query in Azure Portal → Resource Graph Explorer or via Azure CLI:
+
+
+az graph query -q "<KQL query here>"
+
+
+---
+
+If you want, I can also write you a single ARG query that:
+
+1. Takes a policy definition display name
+
+
+2. Finds its ID
+
+
+3. Lists all policy assignments linked to it
+
+
+
+so you don’t have to do it in two steps.
+
+Do you want me to prepare that one-step query?
+
