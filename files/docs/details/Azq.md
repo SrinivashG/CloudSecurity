@@ -123,3 +123,37 @@ so you don’t have to do it in two steps.
 
 Do you want me to prepare that one-step query?
 
+
+
+
+
+let policyDisplayName = "<Your Initiative Display Name>";
+// Step 1: Get initiative definition ID
+let initiativeDef = toscalar(
+    PolicyResources
+    | where type == 'microsoft.authorization/policysetdefinitions'
+    | where properties.displayName =~ policyDisplayName
+    | project id
+);
+// Step 2: Get all child policy definitions inside the initiative
+let childPolicyDefs = PolicyResources
+    | where id == initiativeDef
+    | mv-expand policies = properties.policyDefinitions
+    | extend childPolicyId = tostring(policies.policyDefinitionId)
+    | project childPolicyId;
+// Step 3: Combine initiative ID and child policy IDs
+let allPolicyIds = union (
+    print policyDefinitionId = initiativeDef
+),
+(
+    childPolicyDefs | project policyDefinitionId = childPolicyId
+);
+// Step 4: Get all assignments matching any of these IDs
+PolicyResources
+| where type == 'microsoft.authorization/policyassignments'
+| extend policyDefinitionId = tostring(properties.policyDefinitionId)
+| where policyDefinitionId in (allPolicyIds)
+| project AssignmentName = name,
+          AssignmentId = id,
+          Scope = properties.scope,
+          PolicyDefinitionId = policyDefinitionId
