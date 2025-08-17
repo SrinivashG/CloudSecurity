@@ -157,3 +157,55 @@ PolicyResources
           AssignmentId = id,
           Scope = properties.scope,
           PolicyDefinitionId = policyDefinitionId
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+try this:
+
+policyassignments
+| where properties.status.value == "Enabled"
+| join kind=inner (
+    policydefinitions
+    | project policyDefinitionId = id, policyDefinitionName = properties.displayName
+) on $left.policyDefinitionId == $right.policyDefinitionId
+| where policyDefinitionName == "<YourPolicyDisplayName>"
+| project
+    policyAssignmentId = id,
+    policyAssignmentName = properties.displayName,
+    scope = properties.scope,
+    policyDefinitionName,
+    policyDefinitionId,
+    properties.description,
+    properties.metadata,
+    properties.policyType,
+    properties.mode,
+    properties.version
