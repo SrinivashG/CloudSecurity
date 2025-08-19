@@ -106,3 +106,70 @@ $response.value   # Will display the policy assignments
 
 Following these steps will allow you to authenticate and act as an SPN in PowerShell—either for running Azure cmdlets (`Az` module) or for raw API interaction via tokens. This process is secure, automatable, and the preferred method for reporting, auditing, or automation scenarios in Azure.
 
+
+
+
+
+
+
+
+# ----------------------- Variables: Set These Values -----------------------
+$clientId        = '<your-SPN-appId>'
+$clientSecret    = '<your-SPN-password>'
+$tenantId        = '<your-SPN-tenantId>'
+$subscriptionId  = '<your-subscription-id>'
+$policySetName   = '<your-policy-set-definition-name-or-id>' # Name or full resource ID
+
+# ----------------------- Step 1: Authenticate and Get Token -----------------------
+$body = @{
+    client_id     = $clientId
+    scope         = 'https://management.azure.com/.default'
+    client_secret = $clientSecret
+    grant_type    = 'client_credentials'
+}
+
+$tokenResponse = Invoke-RestMethod -Method POST -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Body $body -ContentType 'application/x-www-form-urlencoded'
+$accessToken = $tokenResponse.access_token
+$headers = @{ Authorization = "Bearer $accessToken" }
+
+# ----------------------- Step 2: Get Policy Set (Initiative) -----------------------
+# Support both short name and full resource ID
+if ($policySetName -notlike "/subscriptions*") {
+    $policySetUri = "https://management.azure.com/subscriptions/$subscriptionId/providers/Microsoft.Authorization/policySetDefinitions/$policySetName?api-version=2022-06-01"
+} else {
+    $policySetUri = "https://management.azure.com$policySetName?api-version=2022-06-01"
+}
+
+$policySetResponse = Invoke-RestMethod -Method GET -Uri $policySetUri -Headers $headers
+
+$policyDefinitions = $policySetResponse.properties.policyDefinitions
+
+# ----------------------- Step 3: For Each Policy Definition, Fetch and Prepare for CSV -----------------------
+$exportList = @()
+foreach ($pd in $policyDefinitions) {
+    $pdUri = "https://management.azure.com$($pd.policyDefinitionId)?api-version=2022-06-01"
+    try {
+        $policyDetail = Invoke-RestMethod -Method GET -Uri $pdUri -Headers $headers
+
+        # Flatten and select fields for CSV (customize as per reporting requirements)
+        $exportList += [PSCustomObject]@{
+            InitiativeReferenceId = $pd.policyDefinitionReferenceId
+            PolicyDefinitionId    = $pd.policyDefinitionId
+            PolicyName            = $policyDetail.name
+            PolicyDisplayName     = $policyDetail.properties.displayName
+            PolicyDescription     = $policyDetail.properties.description
+            PolicyMode            = $policyDetail.properties.mode
+            PolicyType            = $policyDetail.properties.policyType
+            PolicyCategory        = $policyDetail.properties.metadata.category
+            PolicyRule            = ($policyDetail.properties.policyRule | ConvertTo-Json -Compress)
+        }
+    } catch {
+        Write-Warning "Could not retrieve details for $($pd.policyDefinitionId): $_"
+    }
+}
+
+# ----------------------- Step 4: Export to CSV -----------------------
+$csvPath = ".\PolicyDefinitionsUnderInitiative.csv"
+$exportList | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
+
+Write-Host "Export complete. See $csvPath"
