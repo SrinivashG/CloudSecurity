@@ -207,3 +207,34 @@ Pull failures on EKS/ECS	Mismatched architecture	Build multi-arch manifests
 
 Would you like me to generate this as a PDF “ECR Compatibility Remediation Guide” (1 page quick reference)?
 
+Here’s a refined and professional version of your prompt — clearer, structured, and enterprise-ready while keeping your intent intact 👇
+
+
+---
+
+Refined Prompt:
+
+I'm preparing to implement Wiz Outpost in an enterprise, fully automated, multi-cloud environment (AWS, Azure, and GCP). The Outpost will be deployed on EKS, AKS, and GKE, and Terraform will be used for all resource provisioning — no manual steps involved.
+
+I’ll be working closely with the Wiz team throughout the process to clarify setup details, validate architecture decisions, and adopt best practices to get the most out of the platform.
+
+I need a comprehensive checklist that covers:
+
+All technical setup and deployment steps,
+
+Tracking and monitoring of progress and validations,
+
+Key discussion points and clarifications to cover with the Wiz team,
+
+Guidance for automation, scaling, and security hardening,
+
+Any other valuable recommendations to ensure a smooth, scalable, and compliant enterprise implementation.
+
+
+The goal is to have a structured, audit-ready, and repeatable implementation process across all three clouds.
+
+
+---
+
+Would you like me to make a version of this optimized specifically for use as a prompt for internal documentation or AI planning tools (like ChatGPT or Notion AI) — formatted for direct reuse in those systems?
+
