@@ -1,0 +1,46 @@
+{
+  "mode": "All",
+  "policyRule": {
+    "if": {
+      "allOf": [
+        {
+          "field": "type",
+          "equals": "Microsoft.OperationalInsights/workspaces/tables"
+        },
+        {
+          "field": "Microsoft.OperationalInsights/workspaces/tables/totalRetentionInDays",
+          "notEquals": 2190
+        },
+        {
+          "value": "[split(field('id'), '/')[8]]",
+          "equals": "[parameters('workspaceName')]"
+        }
+      ]
+    },
+    "then": {
+      "effect": "modify",
+      "details": {
+        "roleDefinitionIds": [
+          "/providers/Microsoft.Authorization/roleDefinitions/92aaf0da-9dab-42b6-94a3-d43ce8d16293"
+        ],
+        "conflictEffect": "audit",
+        "operations": [
+          {
+            "operation": "addOrReplace",
+            "field": "Microsoft.OperationalInsights/workspaces/tables/totalRetentionInDays",
+            "value": 2190
+          }
+        ]
+      }
+    }
+  },
+  "parameters": {
+    "workspaceName": {
+      "type": "String",
+      "metadata": {
+        "displayName": "Log Analytics Workspace Name",
+        "description": "The name of the Log Analytics workspace where this policy should apply"
+      }
+    }
+  }
+}
