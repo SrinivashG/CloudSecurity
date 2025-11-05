@@ -1,0 +1,120 @@
+{
+  "properties": {
+    "displayName": "Ensure Log Analytics workspace tables have totalRetentionInDays ≥ 2191 (6 years)",
+    "description": "When a table is created/updated in the specified Log Analytics workspace, this policy will deploy a change if the table's total retention is less than the required amount or not set.",
+    "mode": "Indexed",
+    "parameters": {
+      "workspaceResourceId": {
+        "type": "String",
+        "metadata": {
+          "displayName": "Log Analytics workspace resource ID",
+          "description": "The resource ID of the Log Analytics workspace where tables are monitored."
+        }
+      },
+      "minTotalRetentionDays": {
+        "type": "Integer",
+        "metadata": {
+          "displayName": "Minimum total retention in days",
+          "description": "The minimum totalRetentionInDays that tables must have."
+        },
+        "defaultValue": 2191
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.OperationalInsights/workspaces/tables"
+          },
+          {
+            "field": "parentResourceId",
+            "equals": "[parameters('workspaceResourceId')]"
+          },
+          {
+            "anyOf": [
+              {
+                "field": "properties.totalRetentionInDays",
+                "exists": "false"
+              },
+              {
+                "field": "properties.totalRetentionInDays",
+                "lessThan": "[parameters('minTotalRetentionDays')]"
+              }
+            ]
+          }
+        ]
+      },
+      "then": {
+        "effect": "DeployIfNotExists",
+        "details": {
+          "type": "Microsoft.OperationalInsights/workspaces/tables",
+          "name": "[field('name')]",
+          "existenceScope": "resourceGroup",
+          "existenceCondition": {
+            "allOf": [
+              {
+                "field": "properties.totalRetentionInDays",
+                "exists": "true"
+              },
+              {
+                "field": "properties.totalRetentionInDays",
+                "greaterThanOrEqual": "[parameters('minTotalRetentionDays')]"
+              }
+            ]
+          },
+          "roleDefinitionIds": [
+            "/providers/Microsoft.Authorization/roleDefinitions/<ROLE-GUID-for-TablesWrite>"
+          ],
+          "deployment": {
+            "properties": {
+              "mode": "incremental",
+              "template": {
+                "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                "contentVersion": "1.0.0.0",
+                "parameters": {
+                  "workspaceId": {
+                    "type": "string"
+                  },
+                  "tableName": {
+                    "type": "string"
+                  },
+                  "totalRetentionDays": {
+                    "type": "integer"
+                  }
+                },
+                "resources": [
+                  {
+                    "type": "Microsoft.OperationalInsights/workspaces/tables",
+                    "apiVersion": "2022-10-01",
+                    "name": "[concat(parameters('workspaceId'), '/', parameters('tableName'))]",
+                    "properties": {
+                      "totalRetentionInDays": "[parameters('totalRetentionDays')]"
+                    }
+                  }
+                ]
+              },
+              "parameters": {
+                "workspaceId": {
+                  "value": "[parameters('workspaceResourceId')]"
+                },
+                "tableName": {
+                  "value": "[field('name')]"
+                },
+                "totalRetentionDays": {
+                  "value": "[parameters('minTotalRetentionDays')]"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "type": "Microsoft.Authorization/policyDefinitions",
+  "metadata": {
+    "category": "Log Analytics",
+    "version": "1.0.0"
+  },
+  "policyType": "Custom"
+}
