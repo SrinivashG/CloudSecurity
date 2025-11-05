@@ -1,0 +1,64 @@
+{
+  "properties": {
+    "displayName": "Ensure Log Analytics table total retention is 6 years in specific workspace",
+    "description": "When a table is created/updated in the target Log Analytics workspace, ensure totalRetentionInDays is at least 2191 (≈ 6 years). If not, modify it.",
+    "mode": "Indexed",
+    "parameters": {
+      "workspaceResourceId": {
+        "type": "string",
+        "metadata": {
+          "description": "Resource ID of the Log Analytics workspace to apply this policy to."
+        }
+      },
+      "minTotalRetentionDays": {
+        "type": "integer",
+        "metadata": {
+          "description": "Minimum total retention days for tables",
+          "displayName": "Minimum total retention (days)"
+        },
+        "defaultValue": 2191
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.OperationalInsights/workspaces/tables"
+          },
+          {
+            "field": "Microsoft.OperationalInsights/workspaces/tables/parentResourceId",
+            "equals": "[parameters('workspaceResourceId')]"
+          },
+          {
+            "anyOf": [
+              {
+                "field": "properties.totalRetentionInDays",
+                "exists": "false"
+              },
+              {
+                "field": "properties.totalRetentionInDays",
+                "lessThan": "[parameters('minTotalRetentionDays')]"
+              }
+            ]
+          }
+        ]
+      },
+      "then": {
+        "effect": "modify",
+        "details": {
+          "roleDefinitionIds": [
+            "/providers/Microsoft.Authorization/roleDefinitions/..."  // role that allows write on table
+          ],
+          "operations": [
+            {
+              "operation": "addOrReplace",
+              "field": "properties.totalRetentionInDays",
+              "value": "[parameters('minTotalRetentionDays')]"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
